@@ -95,15 +95,17 @@ func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan Trace
 func main() {
 	handle := getHandle()
 	var wg sync.WaitGroup
-	channel := make(chan TraceResult)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	results := make(chan TraceResult)
 	for packet := range packetSource.Packets() {
-		handlePacket(packet, &wg, channel)
+		handlePacket(packet, &wg, results)
 	}
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 	slog.Info("finished running traceroutes...")
-	close(channel)
-	for res := range channel {
+	for res := range results {
 		slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
 		for i, hop := range res.hops {
 			slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
