@@ -11,6 +11,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Hop struct {
@@ -24,6 +25,8 @@ type TraceResult struct {
 	finalDst   string
 	hops       []Hop
 }
+
+var conn *pgxpool.Pool
 
 func getHandle() *pcap.Handle {
 	if os.Getenv("TRACE_ROUTER_LIVE") != "1" {
@@ -94,6 +97,12 @@ func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan Trace
 
 func main() {
 	handle := getHandle()
+	pool, err := Connect("connectionString")
+	if err != nil {
+		slog.Error("Error connecting to database", "error", err)
+		os.Exit(69)
+	}
+	conn = pool
 	var wg sync.WaitGroup
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	results := make(chan TraceResult)
