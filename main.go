@@ -11,10 +11,12 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Hop struct {
+	id      uuid.UUID
 	src     string
 	dest    string
 	latency float64
