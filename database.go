@@ -44,9 +44,9 @@ func GetAggs(conn *pgxpool.Pool) ([]HopsAgg, error) {
 }
 
 func AddHop(hop Hop, conn *pgxpool.Pool) error {
-	_, err := conn.Exec(context.Background(), "insert into hop values ($1, $2, $3, $4)", hop.src, hop.dest, hop.latency)
+	_, err := conn.Exec(context.Background(), "insert into hops values ($1, $2, $3, $4)", hop.id, hop.src, hop.dest, hop.latency)
 	if err != nil {
-		slog.Error("failed to insert new hop")
+		slog.Error("failed to insert new hop", "error", err)
 		return errors.New(string(HopInsertionError))
 	}
 	return nil

@@ -62,6 +62,7 @@ func parseOutput(output string) []Hop {
 					src = hops[len(hops)-1].dest
 				}
 				hops = append(hops, Hop{
+					id:      uuid.New(),
 					src:     src,
 					dest:    split[1],
 					latency: val,
@@ -99,7 +100,7 @@ func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan Trace
 
 func main() {
 	handle := getHandle()
-	pool, err := Connect("connectionString")
+	pool, err := Connect(os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
 		os.Exit(69)
@@ -120,6 +121,7 @@ func main() {
 		slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
 		for i, hop := range res.hops {
 			slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
+			AddHop(hop, conn)
 		}
 	}
 }
