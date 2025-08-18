@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -112,6 +113,10 @@ func main() {
 	for packet := range packetSource.Packets() {
 		handlePacket(packet, &wg, results)
 	}
+
+	http.HandleFunc("/getaggs", HttpGetAggs)
+	http.ListenAndServe(":8080", nil)
+
 	go func() {
 		wg.Wait()
 		close(results)
