@@ -31,6 +31,8 @@ type TraceResult struct {
 
 var conn *pgxpool.Pool
 
+const apiPrefix = "/api/v1/"
+
 func getHandle() *pcap.Handle {
 	if os.Getenv("TRACE_ROUTER_LIVE") != "1" {
 		if handle, err := pcap.OpenOffline(os.Getenv("TRACE_ROUTER_INPUT_FILE")); err != nil {
@@ -114,7 +116,7 @@ func main() {
 		handlePacket(packet, &wg, results)
 	}
 
-	http.HandleFunc("/getaggs", HttpGetAggs)
+	http.HandleFunc(apiPrefix+"aggs/", HttpGetAggs)
 	http.ListenAndServe(":8080", nil)
 
 	go func() {
