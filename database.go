@@ -9,10 +9,10 @@ import (
 )
 
 type HopsAgg struct {
-	source      string
-	destination string
-	count       int
-	avg_latency float32
+	Source_ip   string
+	Dest_ip     string
+	Count       int
+	Avg_latency float32
 }
 
 type DBErrors string

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -29,6 +30,8 @@ type TraceResult struct {
 }
 
 var conn *pgxpool.Pool
+
+const apiPrefix = "/api/v1/"
 
 func getHandle() *pcap.Handle {
 	if os.Getenv("TRACE_ROUTER_LIVE") != "1" {
@@ -112,6 +115,13 @@ func main() {
 	for packet := range packetSource.Packets() {
 		handlePacket(packet, &wg, results)
 	}
+
+	http.HandleFunc(apiPrefix+"aggs/", HttpGetAggs)
+	http.HandleFunc(apiPrefix+"nodes/", HttpGetNodes)
+	http.HandleFunc(apiPrefix+"aggs", HttpGetAggs)
+	http.HandleFunc(apiPrefix+"nodes", HttpGetNodes)
+	http.ListenAndServe(":8080", nil)
+
 	go func() {
 		wg.Wait()
 		close(results)
