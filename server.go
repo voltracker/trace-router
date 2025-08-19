@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -21,10 +22,29 @@ func HttpGetAggs(w http.ResponseWriter, req *http.Request) {
 	sort.Slice(hops[:], func(i, j int) bool {
 		return hops[i].Count > hops[j].Count
 	})
-	for _, agg := range hops {
-		if agg.Source_ip != "localhost" {
-			fmt.Fprintf(w, "source = %s, destination = %s, latency = %f, count = %d \n", agg.Source_ip, agg.Dest_ip, agg.Avg_latency, agg.Count)
-		}
+	out, err := json.Marshal(hops)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "error retrieving hops")
+		return
 	}
+	w.Write(out)
 
+}
+
+func HttpGetNodes(w http.ResponseWriter, req *http.Request) {
+	hops, err := GetAggs(conn)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "error retrieving hops")
+		return
+	}
+	nodeList := GetUniqueNodes(hops)
+	out, err := json.Marshal(nodeList)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "error retrieving hops")
+		return
+	}
+	w.Write(out)
 }

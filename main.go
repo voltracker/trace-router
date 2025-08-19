@@ -117,6 +117,9 @@ func main() {
 	}
 
 	http.HandleFunc(apiPrefix+"aggs/", HttpGetAggs)
+	http.HandleFunc(apiPrefix+"nodes/", HttpGetNodes)
+	http.HandleFunc(apiPrefix+"aggs", HttpGetAggs)
+	http.HandleFunc(apiPrefix+"nodes", HttpGetNodes)
 	http.ListenAndServe(":8080", nil)
 
 	go func() {
