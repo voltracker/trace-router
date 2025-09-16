@@ -1,11 +1,13 @@
-package main
+package internal
 
 import (
 	"context"
 	"errors"
+	"log/slog"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"log/slog"
 )
 
 type HopsAgg struct {
@@ -13,6 +15,19 @@ type HopsAgg struct {
 	Dest_ip     string
 	Count       int
 	Avg_latency float32
+}
+
+type Hop struct {
+	Id      uuid.UUID
+	Src     string
+	Dest    string
+	Latency float64
+}
+
+type TraceResult struct {
+	InitialSrc string
+	FinalDst   string
+	Hops       []Hop
 }
 
 type DBErrors string
@@ -44,7 +59,7 @@ func GetAggs(conn *pgxpool.Pool) ([]HopsAgg, error) {
 }
 
 func AddHop(hop Hop, conn *pgxpool.Pool) error {
-	_, err := conn.Exec(context.Background(), "insert into hops values ($1, $2, $3, $4)", hop.id, hop.src, hop.dest, hop.latency)
+	_, err := conn.Exec(context.Background(), "insert into hops values ($1, $2, $3, $4)", hop.Id, hop.Src, hop.Dest, hop.Latency)
 	if err != nil {
 		slog.Error("failed to insert new hop", "error", err)
 		return errors.New(string(HopInsertionError))
