@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -14,20 +13,11 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/voltracker/trace-router/internal"
+	"github.com/voltracker/trace-router/internal/server"
 )
 
-type Hop struct {
-	id      uuid.UUID
-	src     string
-	dest    string
-	latency float64
-}
-
-type TraceResult struct {
-	initialSrc string
-	finalDst   string
-	hops       []Hop
-}
+import _ "embed"
 
 var conn *pgxpool.Pool
 
@@ -48,9 +38,9 @@ func getHandle() *pcap.Handle {
 	}
 }
 
-func parseOutput(output string) []Hop {
+func parseOutput(output string) []internal.Hop {
 	var lines = strings.Split(output, "\n")
-	var hops = []Hop{}
+	var hops = []internal.Hop{}
 	for line := range lines {
 		if !strings.Contains(lines[line], "*") {
 			split := strings.Fields(lines[line])
@@ -62,13 +52,13 @@ func parseOutput(output string) []Hop {
 				var src string
 				src = "localhost"
 				if len(hops) >= 1 {
-					src = hops[len(hops)-1].dest
+					src = hops[len(hops)-1].Dest
 				}
-				hops = append(hops, Hop{
-					id:      uuid.New(),
-					src:     src,
-					dest:    split[1],
-					latency: val,
+				hops = append(hops, internal.Hop{
+					Id:      uuid.New(),
+					Src:     src,
+					Dest:    split[1],
+					Latency: val,
 				})
 			}
 		}
@@ -76,17 +66,17 @@ func parseOutput(output string) []Hop {
 	return hops
 }
 
-func runTraceroute(src string, dst string, channel chan TraceResult) {
+func runTraceroute(src string, dst string, channel chan internal.TraceResult) {
 	out, err := exec.Command("/usr/sbin/traceroute", "-n", "-q 1", dst).Output()
 	if err != nil {
 		slog.Error("failed to execute command", "error", err)
 	}
 	hops := parseOutput(string(out))
 	slog.Info("finished traceroute for " + dst + "...")
-	channel <- TraceResult{initialSrc: src, finalDst: dst, hops: hops}
+	channel <- internal.TraceResult{InitialSrc: src, FinalDst: dst, Hops: hops}
 }
 
-func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan TraceResult) {
+func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan internal.TraceResult) {
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer != nil {
 		ipv4, ok := ipLayer.(*layers.IPv4)
@@ -102,25 +92,26 @@ func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan Trace
 }
 
 func main() {
-	handle := getHandle()
-	pool, err := Connect(os.Getenv("CONNECTION_STRING"))
+
+	pool, err := internal.Connect(os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
 		os.Exit(69)
 	}
-	conn = pool
+
+	conf := &server.ServerConfig{
+		ApiPrefix:    apiPrefix,
+		DBConnection: pool,
+	}
+
+	go server.Start(conf)
+	handle := getHandle()
 	var wg sync.WaitGroup
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	results := make(chan TraceResult)
+	results := make(chan internal.TraceResult)
 	for packet := range packetSource.Packets() {
 		handlePacket(packet, &wg, results)
 	}
-
-	http.HandleFunc(apiPrefix+"aggs/", HttpGetAggs)
-	http.HandleFunc(apiPrefix+"nodes/", HttpGetNodes)
-	http.HandleFunc(apiPrefix+"aggs", HttpGetAggs)
-	http.HandleFunc(apiPrefix+"nodes", HttpGetNodes)
-	http.ListenAndServe(":8080", nil)
 
 	go func() {
 		wg.Wait()
@@ -128,10 +119,11 @@ func main() {
 	}()
 	slog.Info("finished running traceroutes...")
 	for res := range results {
-		slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
-		for i, hop := range res.hops {
-			slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
-			AddHop(hop, conn)
+		// slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
+		for _, hop := range res.Hops {
+			// slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
+			internal.AddHop(hop, conn)
 		}
 	}
+	select {}
 }
