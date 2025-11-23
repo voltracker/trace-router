@@ -51,7 +51,7 @@ func stubbedAggs(w http.ResponseWriter, req *http.Request) {
 
 func Start(config *ServerConfig) {
 	mux := http.NewServeMux()
-
+	conn = config.DBConnection
 	mux.HandleFunc(config.ApiPrefix+"aggs/", stubbedAggs)
 	mux.HandleFunc(config.ApiPrefix+"nodes/", stubbedNodes)
 	mux.HandleFunc(config.ApiPrefix+"aggs", stubbedAggs)
@@ -98,7 +98,7 @@ func HttpGetNodes(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(w, "error retrieving hops")
 		return
 	}
-	nodeList := internal.GetUniqueNodes(hops)
+	nodeList := internal.GetUniqueNodes(hops, conn)
 	slog.Info("retrieving unique nodes")
 	arr := []internal.NodeInfo{}
 	for _, v := range nodeList {
