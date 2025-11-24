@@ -60,14 +60,18 @@ func (l Location) toGeoip() Geoip {
 }
 
 func addLocations(nodes NodeList, conn *pgxpool.Pool) (NodeList, error) {
-	ips := []string{}
+	ips := []Geoip{}
 	ipsInDb := []Geoip{}
 	for ip := range nodes {
 		geoip, err := getIp(ip, conn)
 		if errors.Is(IpNotPresent, err) {
-			ips = append(ips, ip)
+			panic(1)
 		} else {
-			ipsInDb = append(ipsInDb, geoip)
+			if geoip.Org == "" {
+				ips = append(ips, geoip)
+			} else {
+				ipsInDb = append(ipsInDb, geoip)
+			}
 		}
 	}
 	tmpNodes := make(NodeList)
@@ -80,10 +84,10 @@ func addLocations(nodes NodeList, conn *pgxpool.Pool) (NodeList, error) {
 			return nil, err
 		} else {
 			for _, loc := range locs {
-				AddIp(loc.toGeoip(), conn)
-				info := nodes[loc.Query]
-				slog.Info("got location", "ip", loc.Query, "latitude", loc.Latitude, "longitude", loc.Longitude)
-				tmpNodes[loc.Query] = NodeInfo{Ip: loc.Query, Count: info.Count, Longitude: loc.Longitude, Latitude: loc.Latitude}
+				UpdateIp(loc, conn)
+				info := nodes[loc.Ip]
+				slog.Info("got location", "ip", loc.Ip, "latitude", loc.Lat, "longitude", loc.Lon)
+				tmpNodes[loc.Ip] = NodeInfo{Ip: loc.Ip, Count: info.Count, Longitude: loc.Lon, Latitude: loc.Lat}
 			}
 			base += 100
 		}
@@ -95,10 +99,10 @@ func addLocations(nodes NodeList, conn *pgxpool.Pool) (NodeList, error) {
 		return nil, err
 	} else {
 		for _, loc := range locs {
-			AddIp(loc.toGeoip(), conn)
-			info := nodes[loc.Query]
-			slog.Info("got location", "ip", loc.Query, "latitude", loc.Latitude, "longitude", loc.Longitude)
-			tmpNodes[loc.Query] = NodeInfo{Ip: loc.Query, Count: info.Count, Longitude: loc.Longitude, Latitude: loc.Latitude}
+			UpdateIp(loc, conn)
+			info := nodes[loc.Ip]
+			slog.Info("got location", "ip", loc.Ip, "latitude", loc.Lat, "longitude", loc.Lon)
+			tmpNodes[loc.Ip] = NodeInfo{Ip: loc.Ip, Count: info.Count, Longitude: loc.Lon, Latitude: loc.Lat}
 		}
 	}
 
@@ -110,12 +114,16 @@ func addLocations(nodes NodeList, conn *pgxpool.Pool) (NodeList, error) {
 	return tmpNodes, nil
 }
 
-func getLocations(ips []string) ([]Location, error) {
+func getLocations(ips []Geoip) ([]Geoip, error) {
 	if len(ips) > 100 {
 		return nil, errors.New("can't request more than 100 ips at a time")
 	}
+	rawips := make([]string, len(ips))
+	for i := range ips {
+		rawips[i] = ips[i].Ip
+	}
 	requestStr := "http://ip-api.com/batch?fields=11968"
-	requestBody, err := json.Marshal(ips)
+	requestBody, err := json.Marshal(rawips)
 	slog.Info("body", "content", requestBody)
 	if err != nil {
 		slog.Error("failed to marshal ip array to json", "error", err)
@@ -138,5 +146,17 @@ func getLocations(ips []string) ([]Location, error) {
 		slog.Error("Failed to parse json", "input", body, "error", err)
 		return nil, err
 	}
-	return locations, nil
+
+	for _, loc := range locations {
+		for i, _ := range ips {
+			if loc.Query == ips[i].Ip {
+				ips[i].Lat = loc.Latitude
+				ips[i].Lon = loc.Longitude
+				ips[i].Isp = loc.Isp
+				ips[i].Org = loc.Org
+				ips[i].Asn = loc.Asn
+			}
+		}
+	}
+	return ips, nil
 }

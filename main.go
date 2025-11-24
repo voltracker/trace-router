@@ -104,6 +104,8 @@ func main() {
 		DBConnection: pool,
 	}
 
+	conn = pool
+
 	go server.Start(conf)
 	handle := getHandle()
 	var wg sync.WaitGroup
@@ -122,6 +124,8 @@ func main() {
 		// slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
 		for _, hop := range res.Hops {
 			// slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
+			internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Src}, conn)
+			internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Dest}, conn)
 			internal.AddHop(hop, conn)
 		}
 	}
