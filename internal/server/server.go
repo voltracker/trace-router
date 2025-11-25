@@ -52,10 +52,11 @@ func stubbedAggs(w http.ResponseWriter, req *http.Request) {
 func Start(config *ServerConfig) {
 	mux := http.NewServeMux()
 	conn = config.DBConnection
-	mux.HandleFunc(config.ApiPrefix+"aggs/", stubbedAggs)
-	mux.HandleFunc(config.ApiPrefix+"nodes/", stubbedNodes)
-	mux.HandleFunc(config.ApiPrefix+"aggs", stubbedAggs)
-	mux.HandleFunc(config.ApiPrefix+"nodes", stubbedNodes)
+	slog.Info("Starting HTTP server")
+	mux.HandleFunc(config.ApiPrefix+"aggs/", HttpGetAggs)
+	mux.HandleFunc(config.ApiPrefix+"nodes/", HttpGetNodes)
+	mux.HandleFunc(config.ApiPrefix+"aggs", HttpGetAggs)
+	mux.HandleFunc(config.ApiPrefix+"nodes", HttpGetNodes)
 
 	handler := corsMiddleware(mux)
 

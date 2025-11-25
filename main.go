@@ -92,7 +92,6 @@ func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup, channel chan inter
 }
 
 func main() {
-
 	pool, err := internal.Connect(os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
@@ -107,26 +106,28 @@ func main() {
 	conn = pool
 
 	go server.Start(conf)
-	handle := getHandle()
-	var wg sync.WaitGroup
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	results := make(chan internal.TraceResult)
-	for packet := range packetSource.Packets() {
-		handlePacket(packet, &wg, results)
-	}
+	if os.Getenv("TRACE_ROUTER_PACKET_COLLECTION") == "true" {
+		handle := getHandle()
+		var wg sync.WaitGroup
+		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+		results := make(chan internal.TraceResult)
+		for packet := range packetSource.Packets() {
+			handlePacket(packet, &wg, results)
+		}
 
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-	slog.Info("finished running traceroutes...")
-	for res := range results {
-		// slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
-		for _, hop := range res.Hops {
-			// slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
-			internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Src}, conn)
-			internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Dest}, conn)
-			internal.AddHop(hop, conn)
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+		slog.Info("finished running traceroutes...")
+		for res := range results {
+			// slog.Info("Traceroute for " + res.initialSrc + " -> " + res.finalDst)
+			for _, hop := range res.Hops {
+				// slog.Info("Hop "+strconv.Itoa(i)+": ", "src", hop.src, "dest", hop.dest, "latency", hop.latency)
+				internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Src}, conn)
+				internal.AddIp(internal.Geoip{Id: uuid.New(), Ip: hop.Dest}, conn)
+				internal.AddHop(hop, conn)
+			}
 		}
 	}
 	select {}

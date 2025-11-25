@@ -51,13 +51,13 @@ type Geoip struct {
 }
 
 type tmpGeoip struct {
-	Id  uuid.UUID
-	Ip  pgtype.Inet
-	Lat float32
-	Lon float32
-	Isp string
-	Org string
-	Asn string
+	Id  uuid.UUID   `db:"id"`
+	Ip  pgtype.Inet `db:"ip_addr"`
+	Lat float32     `db:"lat"`
+	Lon float32     `db:"lon"`
+	Isp string      `db:"isp"`
+	Org string      `db:"org"`
+	Asn string      `db:"asn"`
 }
 
 type DBErrors string
